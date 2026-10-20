@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEURODECK // BREACH PROTOCOL</title>
+<style>
+:root {
+  --bg:#080d12; --panel:#0c151b; --panel2:#101d24; --grid:#19313a;
+  --green:#8dffcf; --green2:#39e6ae; --muted:#527b80; --white:#d9f6f1;
+  --red:#ff596b; --amber:#ffd27a;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; min-height:100vh; background:var(--bg); color:var(--green);
+  font:14px Consolas, "Courier New", monospace;
+  background-image:linear-gradient(#19313a18 1px,transparent 1px),linear-gradient(90deg,#19313a18 1px,transparent 1px);
+  background-size:24px 24px;
+}
+header { height:42px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--panel); border-bottom:1px solid var(--grid); font-size:12px; }
+header strong { color:var(--green2); letter-spacing:.06em; }
+.muted { color:var(--muted); }
+main { max-width:1200px; margin:auto; padding:22px 24px 14px; }
+.titlebar { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+h1 { margin:0; font-size:clamp(27px,4vw,38px); letter-spacing:.04em; color:var(--white); }
+h1 span { color:var(--green2); }
+.node { color:var(--amber); font-weight:bold; font-size:12px; }
+.subtitle { margin:10px 0 18px; color:var(--muted); font-weight:bold; font-size:12px; }
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:14px; }
+.panel { background:var(--panel); border:1px solid var(--grid); min-width:0; }
+.panel-head { padding:12px 14px; background:var(--panel2); display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--green2); font-weight:bold; }
+#timer { font-size:18px; color:var(--amber); }
+.matrix { padding:clamp(10px,2vw,20px); display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+.code {
+  min-height:70px; border:1px solid var(--grid); border-radius:2px; background:var(--panel2);
+  color:var(--green); font: bold clamp(15px,2vw,20px) Consolas,monospace; cursor:pointer;
+  transition:background .12s,border-color .12s,transform .12s;
+}
+.code:hover:not(:disabled) { background:#17372f; border-color:var(--green2); transform:translateY(-1px); }
+.code.selected { background:#17664f; color:var(--white); border-color:var(--green2); box-shadow:0 0 12px #39e6ae30; }
+.code:disabled { cursor:not-allowed; opacity:.75; }
+.feedback { min-height:42px; padding:0 18px 16px; color:var(--muted); font-weight:bold; font-size:12px; line-height:1.5; }
+.side-head { padding:10px 12px; background:var(--panel2); color:var(--green2); font-weight:bold; }
+.side-content { padding:14px; }
+.target-list { display:grid; gap:10px; margin-bottom:14px; }
+.target { display:flex; gap:12px; align-items:center; color:var(--white); font-size:15px; font-weight:bold; }
+.target small { color:var(--muted); font-size:11px; }
+#progress { color:var(--muted); font-size:12px; margin:12px 0 18px; }
+.buffer { display:grid; gap:6px; padding:12px 0; }
+.slot { padding:10px; text-align:center; background:var(--bg); border:1px solid var(--grid); color:var(--muted); font-size:15px; font-weight:bold; }
+.slot.filled { background:#174b3c; color:var(--green); border-color:#24735a; }
+.rewards { padding:10px; display:grid; gap:7px; }
+.action, .reset {
+  border:1px solid var(--grid); background:var(--panel2); color:var(--green); padding:11px 12px;
+  font: bold 12px Consolas,monospace; cursor:pointer; letter-spacing:.03em;
+}
+.action:hover, .reset:hover { background:#205b4d; border-color:var(--green2); color:var(--white); }
+.locked { color:var(--muted); font-size:12px; padding:4px 0; }
+footer { color:#34545a; font-size:10px; margin:16px 2px 10px; }
+.bottom { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.reset { padding:12px 14px; }
+.tip { color:var(--muted); font-size:11px; }
+.overlay {
+  position:fixed; inset:0; display:none; place-items:center; padding:20px; z-index:5;
+  background:#000b; backdrop-filter:blur(4px);
+}
+.overlay.show { display:grid; }
+.modal { width:min(560px,100%); padding:28px; text-align:center; border:1px solid var(--red); background:#17090d; box-shadow:0 0 50px #ff596b25; }
+.modal h2 { color:var(--red); font-size:clamp(23px,4vw,34px); }
+.modal p { color:#ffb4bd; line-height:1.8; }
+@media (max-width:760px) {
+  main { padding:16px 12px; }
+  .layout { grid-template-columns:1fr; }
+  .matrix { gap:5px; padding:10px; }
+  .code { min-height:58px; }
+  header { padding:0 10px; font-size:10px; }
+}
+@media (max-width:390px) { .code { min-height:48px; } .subtitle { font-size:10px; } }
+</style>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#080d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js");
+    });
+  }
+</script>
+</head>
+<body>
+<header>
+  <strong>NIGHT CITY // NETRUNNER UTILITY</strong>
+  <span class="muted">LOCAL SANDBOX • BREACH SIMULATION</span>
+</header>
+<main>
+  <div class="titlebar">
+    <h1>BREACH <span>PROTOCOL</span></h1>
+    <div class="node">ICE // ACCESS NODE 07</div>
+  </div>
+  <p class="subtitle">UPLOAD DAEMON SEQUENCE TO EXPOSE AVAILABLE QUICKHACKS</p>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="panel-head"><span>// CODE MATRIX</span><span id="timer">00:45</span></div>
+      <div class="matrix" id="matrix" aria-label="Code matrix"></div>
+      <div class="feedback" id="feedback" aria-live="polite">SELECT A CODE FROM THE TOP ROW TO BEGIN</div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head">// DAEMON SEQUENCE</div>
+      <div class="side-content">
+        <div class="target-list" id="targets"></div>
+        <div id="progress">0 / 5 UPLOADS</div>
+        <div class="side-head">// BUFFER</div>
+        <div class="buffer" id="buffer">
+          <div class="slot">--</div><div class="slot">--</div><div class="slot">--</div><div class="slot">--</div><div class="slot">--</div>
+        </div>
+        <div class="side-head">// QUICKHACKS</div>
+        <div class="rewards" id="rewards"><div class="locked">QUICKHACKS LOCKED</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>NEURODECK // FAN-MADE SIMULATION • NO SYSTEM CHANGES WITHOUT YOUR ACTION</footer>
+  <div class="bottom">
+    <button class="reset" id="reset">REINITIALIZE MATRIX</button>
+    <span class="tip">TIP: ROW → COLUMN → ROW → COLUMN</span>
+  </div>
+</main>
+
+<div class="overlay" id="glitchOverlay" role="dialog" aria-modal="true" aria-labelledby="glitchTitle">
+  <div class="modal">
+    <h2 id="glitchTitle">SYSTEM BREACH DETECTED</h2>
+    <p>NEURAL LINK: UNSTABLE</p>
+    <button class="action" id="dismiss">DISMISS</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const CODES = ["1C", "55", "BD", "E9", "7A", "FF", "C1", "D3"];
+  const $ = id => document.getElementById(id);
+  let board, solution, target, selected, buttons, timeLeft, timerId, won, roundId;
+
+  function makePuzzle() {
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const grid = Array.from({length:5}, () => Array.from({length:5}, () => CODES[Math.floor(Math.random()*CODES.length)]));
+      const path = [[Math.floor(Math.random()*5),0]];
+      while (path.length < 5) {
+        const [r,c] = path[path.length-1];
+        const candidates = path.length % 2
+          ? Array.from({length:5},(_,rr)=>[rr,c]).filter(([rr,cc])=>rr!==r&&!path.some(([pr,pc])=>pr===rr&&pc===cc))
+          : Array.from({length:5},(_,cc)=>[r,cc]).filter(([rr,cc])=>cc!==c&&!path.some(([pr,pc])=>pr===rr&&pc===cc));
+        if (!candidates.length) break;
+        path.push(candidates[Math.floor(Math.random()*candidates.length)]);
+      }
+      if (path.length === 5) return {board:grid, solution:path, target:path.map(([r,c])=>grid[r][c])};
+    }
+    const grid = Array.from({length:5}, () => Array.from({length:5}, () => CODES[Math.floor(Math.random()*CODES.length)]));
+    const path = [[0,0],[1,0],[1,1],[2,1],[2,2]];
+    return {board:grid, solution:path, target:path.map(([r,c])=>grid[r][c])};
+  }
+
+  function newRound() {
+    clearInterval(timerId);
+    roundId = (roundId || 0) + 1;
+    ({board, solution, target} = makePuzzle());
+    selected = [];
+    won = false;
+    timeLeft = 45;
+    $("timer").textContent = "00:45";
+    $("timer").style.color = "var(--amber)";
+    $("targets").innerHTML = target.map((code,i)=>`<div class="target"><small>${String(i+1).padStart(2,"0")}</small><span>${code}</span></div>`).join("");
+    $("progress").textContent = "0 / 5 UPLOADS";
+    setFeedback("SELECT A CODE FROM THE TOP ROW TO BEGIN", "muted");
+    $("matrix").innerHTML = "";
+    buttons = [];
+    for (let r=0;r<5;r++) {
+      buttons[r] = [];
+      for (let c=0;c<5;c++) {
+        const b = document.createElement("button");
+        b.className = "code";
+        b.textContent = board[r][c];
+        b.setAttribute("aria-label", `Row ${r+1}, column ${c+1}, code ${board[r][c]}`);
+        b.addEventListener("click", () => pick(r,c));
+        $("matrix").appendChild(b);
+        buttons[r][c] = b;
+      }
+    }
+    updateBuffer();
+    showRewards(false);
+    const thisRound = roundId;
+    timerId = setInterval(() => {
+      if (thisRound !== roundId || won) return;
+      timeLeft--;
+      $("timer").textContent = `00:${String(Math.max(0,timeLeft)).padStart(2,"0")}`;
+      $("timer").style.color = timeLeft <= 10 ? "var(--red)" : "var(--amber)";
+      if (timeLeft <= 0) {
+        clearInterval(timerId);
+        setFeedback("UPLOAD TIMEOUT // ICE REJECTED THE BREACH", "red");
+        disableMatrix();
+      }
+    },1000);
+  }
+
+  function validPick(r,c) {
+    if (!selected.length) return r === 0;
+    if (selected.some(([rr,cc])=>rr===r&&cc===c)) return false;
+    const [pr,pc] = selected[selected.length-1];
+    return selected.length % 2 ? c === pc : r === pr;
+  }
+
+  function pick(r,c) {
+    if (won || timeLeft <= 0) return;
+    if (!validPick(r,c)) {
+      setFeedback("INVALID VECTOR // FOLLOW ROW-COLUMN ALTERNATION","red");
+      return;
+    }
+    const actual = board[r][c], expected = target[selected.length];
+    if (actual !== expected) {
+      selected = [];
+      refresh();
+      updateBuffer();
+      $("progress").textContent = "0 / 5 UPLOADS";
+      setFeedback(`SEQUENCE MISMATCH (${actual}) // BUFFER CLEARED`,"red");
+      return;
+    }
+    selected.push([r,c]);
+    refresh();
+    updateBuffer();
+    $("progress").textContent = `${selected.length} / 5 UPLOADS`;
+    setFeedback(`CODE ACCEPTED // ${actual}`,"green2");
+    if (selected.length === target.length) success();
+  }
+
+  function refresh() {
+    buttons.forEach((row,r)=>row.forEach((b,c)=>{
+      const active = selected.some(([rr,cc])=>rr===r&&cc===c);
+      b.classList.toggle("selected",active);
+    }));
+  }
+  function updateBuffer() {
+    $("buffer").innerHTML = Array.from({length:5},(_,i)=>{
+      if (i < selected.length) {
+        const [r,c] = selected[i];
+        return `<div class="slot filled">${board[r][c]}</div>`;
+      }
+      return '<div class="slot">--</div>';
+    }).join("");
+  }
+  function disableMatrix() { buttons.flat().forEach(b=>b.disabled=true); }
+  function setFeedback(text,color) {
+    $("feedback").textContent=text;
+    $("feedback").style.color = color === "muted" ? "var(--muted)" : `var(--${color})`;
+  }
+  function showRewards(show) {
+    const el=$("rewards");
+    if (!show) { el.innerHTML='<div class="locked">QUICKHACKS LOCKED</div>'; return; }
+    el.innerHTML="";
+    const actions=[
+      ["RELIC GLITCH",glitch],
+      ["PLAY VIDEO",playVideo],
+      ["OPEN NET",openSite],
+      ["PING DIAGNOSTIC",diagnostic]
+    ];
+    const heading=document.createElement("div");
+    heading.className="locked";
+    heading.style.color="var(--green2)";
+    heading.textContent="// QUICKHACKS UNLOCKED";
+    el.appendChild(heading);
+    actions.forEach(([label,fn])=>{
+      const b=document.createElement("button");
+      b.className="action"; b.textContent=label; b.addEventListener("click",fn); el.appendChild(b);
+    });
+  }
+  function success() {
+    won=true; clearInterval(timerId);
+    setFeedback("BREACH SUCCESSFUL // ACCESS GRANTED","green2");
+    disableMatrix(); showRewards(true);
+  }
+  function glitch() { $("glitchOverlay").classList.add("show"); }
+  function playVideo() {
+    const picker=document.createElement("input");
+    picker.type="file"; picker.accept="video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,.m4v";
+    picker.addEventListener("change",()=>{
+      const file=picker.files && picker.files[0];
+      if (!file) return;
+      const url=URL.createObjectURL(file);
+      const win=window.open("","_blank");
+      if (!win) { URL.revokeObjectURL(url); alert("Your browser blocked the video window. Allow pop-ups and try again."); return; }
+      win.document.write(`<!doctype html><title>NEURODECK // VIDEO PAYLOAD</title><body style="margin:0;background:#080d12;display:grid;place-items:center;min-height:100vh"><video controls autoplay style="max-width:100%;max-height:100vh" src="${url}"></video></body>`);
+    });
+    picker.click();
+  }
+  function openSite() { window.open("https://www.cyberpunk.net/","_blank","noopener,noreferrer"); setFeedback("NET ACCESS ESTABLISHED","green2"); }
+  function diagnostic() {
+    alert(`PING // SYSTEM DIAGNOSTIC\n\nBrowser: ${navigator.userAgent}\nPlatform: ${navigator.platform || "Unknown"}\n\nDIAGNOSTIC COMPLETE // NO SETTINGS CHANGED.`);
+  }
+  $("reset").addEventListener("click",newRound);
+  $("dismiss").addEventListener("click",()=>$("glitchOverlay").classList.remove("show"));
+  $("glitchOverlay").addEventListener("click",e=>{if(e.target===$("glitchOverlay")) $("glitchOverlay").classList.remove("show");});
+  newRound();
+})();
+</script>
+</body>
+</html>
